@@ -38,8 +38,8 @@ export async function addCommand(skillName: string) {
 
   try {
     // Pass spinner callback to update text
-    await client.downloadSkill(skillName, targetDir, (fileName, current, total) => {
-        spinner.text = chalk.blue(`⬇️ 正在下载 (${current}/${total}): ${fileName}`);
+    await client.downloadSkill(skillName, targetDir, (fileName) => {
+        spinner.text = chalk.blue(`⬇️ 正在下载: ${fileName}`);
     });
     spinner.succeed(chalk.green(`安装成功！已保存至 ${targetDir}`));
   } catch (error: any) {

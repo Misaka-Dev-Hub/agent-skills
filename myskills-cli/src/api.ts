@@ -16,7 +16,7 @@ interface GiteaFile {
   html_url?: string;
 }
 
-export type DownloadProgressCallback = (fileName: string, current: number, total: number) => void;
+export type DownloadProgressCallback = (filePath: string) => void;
 
 export class GiteaClient {
   private client: AxiosInstance;
@@ -54,41 +54,41 @@ export class GiteaClient {
 
   async downloadSkill(skillName: string, destPath: string, onProgress?: DownloadProgressCallback): Promise<void> {
     const sourcePath = `${GITEA_ROOT_PATH}/${skillName}`;
-    const url = `/api/v1/repos/${GITEA_OWNER}/${GITEA_REPO}/contents/${sourcePath}`;
-
     try {
-      const response = await this.client.get<GiteaFile[]>(url);
-
-      if (!Array.isArray(response.data)) {
-        throw new Error(`Skill '${skillName}' is not a directory.`);
-      }
-
-      // Create destination directory
-      fs.mkdirSync(destPath, { recursive: true });
-
-      const files = response.data.filter(item => item.type === 'file');
-      const totalFiles = files.length;
-
-      for (let i = 0; i < totalFiles; i++) {
-        const item = files[i];
-        if (onProgress) {
-            onProgress(item.name, i + 1, totalFiles);
-        }
-        await this.downloadFile(item, destPath);
-      }
-
-      // Handle directories separately (just warning for now)
-      response.data
-        .filter(item => item.type === 'dir')
-        .forEach(item => {
-             console.warn(`Skipping subdirectory ${item.name} (nested directories not supported in v1.0)`);
-        });
-
+      await this.downloadRecursive(sourcePath, destPath, onProgress);
     } catch (error: any) {
        if (error.response && error.response.status === 404) {
          throw new Error(`Skill '${skillName}' not found.`);
       }
       throw error;
+    }
+  }
+
+  private async downloadRecursive(sourcePath: string, destPath: string, onProgress?: DownloadProgressCallback): Promise<void> {
+    const url = `/api/v1/repos/${GITEA_OWNER}/${GITEA_REPO}/contents/${sourcePath}`;
+    const response = await this.client.get<GiteaFile[]>(url);
+
+    if (!Array.isArray(response.data)) {
+        // It might be a single file if we pointed to a file, but for skills it should be a dir
+        throw new Error(`Path '${sourcePath}' is not a directory.`);
+    }
+
+    // Create destination directory
+    fs.mkdirSync(destPath, { recursive: true });
+
+    for (const item of response.data) {
+      if (item.type === 'file') {
+        if (onProgress) {
+           // We pass the relative path from the skill root if we wanted, but here we just pass filename or relative path
+           // simpler to pass item.path which is full gitea path, or item.name.
+           // Let's pass item.name for simplicity, or we can try to show context.
+           onProgress(item.name);
+        }
+        await this.downloadFile(item, destPath);
+      } else if (item.type === 'dir') {
+        const newDestPath = path.join(destPath, item.name);
+        await this.downloadRecursive(item.path, newDestPath, onProgress);
+      }
     }
   }
 
