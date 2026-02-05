@@ -16,6 +16,8 @@ interface GiteaFile {
   html_url?: string;
 }
 
+export type DownloadProgressCallback = (fileName: string, current: number, total: number) => void;
+
 export class GiteaClient {
   private client: AxiosInstance;
 
@@ -50,7 +52,7 @@ export class GiteaClient {
     }
   }
 
-  async downloadSkill(skillName: string, destPath: string): Promise<void> {
+  async downloadSkill(skillName: string, destPath: string, onProgress?: DownloadProgressCallback): Promise<void> {
     const sourcePath = `${GITEA_ROOT_PATH}/${skillName}`;
     const url = `/api/v1/repos/${GITEA_OWNER}/${GITEA_REPO}/contents/${sourcePath}`;
 
@@ -64,13 +66,24 @@ export class GiteaClient {
       // Create destination directory
       fs.mkdirSync(destPath, { recursive: true });
 
-      for (const item of response.data) {
-        if (item.type === 'file') {
-          await this.downloadFile(item, destPath);
-        } else if (item.type === 'dir') {
-             console.warn(`Skipping subdirectory ${item.name} (nested directories not supported in v1.0)`);
+      const files = response.data.filter(item => item.type === 'file');
+      const totalFiles = files.length;
+
+      for (let i = 0; i < totalFiles; i++) {
+        const item = files[i];
+        if (onProgress) {
+            onProgress(item.name, i + 1, totalFiles);
         }
+        await this.downloadFile(item, destPath);
       }
+
+      // Handle directories separately (just warning for now)
+      response.data
+        .filter(item => item.type === 'dir')
+        .forEach(item => {
+             console.warn(`Skipping subdirectory ${item.name} (nested directories not supported in v1.0)`);
+        });
+
     } catch (error: any) {
        if (error.response && error.response.status === 404) {
          throw new Error(`Skill '${skillName}' not found.`);

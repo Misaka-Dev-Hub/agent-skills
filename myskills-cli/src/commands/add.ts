@@ -2,6 +2,7 @@ import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
 import inquirer from 'inquirer';
+import ora from 'ora';
 import { GiteaClient } from '../api.js';
 import { getGiteaToken } from '../config.js';
 
@@ -14,6 +15,7 @@ export async function addCommand(skillName: string) {
 
   const targetDir = path.resolve(process.cwd(), '.claude/skills', skillName);
 
+  // Handle overwrite prompt BEFORE starting spinner
   if (fs.existsSync(targetDir)) {
     console.log(chalk.yellow(`Directory already exists: ${targetDir}`));
     const answer = await inquirer.prompt([
@@ -31,18 +33,21 @@ export async function addCommand(skillName: string) {
     }
   }
 
+  const spinner = ora(chalk.cyan(`📡 正在获取 ${skillName} 文件清单...`)).start();
   const client = new GiteaClient();
 
   try {
-    console.log(chalk.blue(`Downloading skill '${skillName}'...`));
-    await client.downloadSkill(skillName, targetDir);
-    console.log(chalk.green(`Successfully installed skill '${skillName}' to ${targetDir}`));
+    // Pass spinner callback to update text
+    await client.downloadSkill(skillName, targetDir, (fileName, current, total) => {
+        spinner.text = chalk.blue(`⬇️ 正在下载 (${current}/${total}): ${fileName}`);
+    });
+    spinner.succeed(chalk.green(`安装成功！已保存至 ${targetDir}`));
   } catch (error: any) {
+    let errorMessage = error.message;
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-         console.error(chalk.red('Authentication failed: Invalid token or insufficient permissions.'));
-    } else {
-        console.error(chalk.red(`Error: ${error.message}`));
+         errorMessage = 'Authentication failed: Invalid token or insufficient permissions.';
     }
+    spinner.fail(chalk.red(`下载失败: ${errorMessage}`));
     process.exit(1);
   }
 }

@@ -42,6 +42,18 @@ vi.mock('../src/api.js', () => {
     }
 });
 
+// Mock ora
+const spinnerMock = {
+    start: vi.fn().mockReturnThis(),
+    stopAndPersist: vi.fn().mockReturnThis(),
+    succeed: vi.fn().mockReturnThis(),
+    fail: vi.fn().mockReturnThis(),
+    text: '',
+};
+vi.mock('ora', () => ({
+    default: vi.fn(() => spinnerMock),
+}));
+
 
 // Mock Console
 const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -54,6 +66,7 @@ describe('Authentication Module', () => {
     vi.clearAllMocks();
     delete process.env.GITEA_TOKEN;
     for (const key in mockConfig) delete mockConfig[key];
+    spinnerMock.text = '';
   });
 
   describe('Token Priority', () => {
@@ -86,9 +99,10 @@ describe('Authentication Module', () => {
 
         await loginCommand();
 
+        expect(spinnerMock.start).toHaveBeenCalled();
         expect(mockListSkills).toHaveBeenCalled();
         expect(mockConfig['gitea_token']).toBe('valid-token');
-        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Login Successful'));
+        expect(spinnerMock.succeed).toHaveBeenCalledWith(expect.stringContaining('登录成功'));
     });
 
     it('should not save token if verification fails and user exits', async () => {
@@ -112,7 +126,7 @@ describe('Authentication Module', () => {
 
         expect(mockListSkills).toHaveBeenCalled();
         expect(mockConfig['gitea_token']).toBeUndefined();
-        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Authentication failed'));
+        expect(spinnerMock.fail).toHaveBeenCalledWith(expect.stringContaining('Authentication failed'));
     });
 
     it('should retry if verification fails and user chooses retry', async () => {
@@ -138,7 +152,7 @@ describe('Authentication Module', () => {
 
          expect(mockListSkills).toHaveBeenCalledTimes(2);
          expect(mockConfig['gitea_token']).toBe('valid-token');
-         expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Login Successful'));
+         expect(spinnerMock.succeed).toHaveBeenCalledWith(expect.stringContaining('登录成功'));
     });
   });
 

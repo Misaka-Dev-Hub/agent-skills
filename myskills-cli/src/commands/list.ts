@@ -1,4 +1,5 @@
 import chalk from 'chalk';
+import ora from 'ora';
 import { GiteaClient } from '../api.js';
 import { getGiteaToken } from '../config.js';
 
@@ -9,27 +10,27 @@ export async function listCommand() {
     process.exit(1);
   }
 
+  const spinner = ora(chalk.cyan('🔍 正在从 Gitea 获取 Skill 列表...')).start();
   const client = new GiteaClient();
 
   try {
-    console.log(chalk.blue('Fetching available skills...'));
     const skills = await client.listSkills();
 
     if (skills.length === 0) {
-      console.log(chalk.yellow('No skills found.'));
+      spinner.stopAndPersist({ symbol: '⚠️', text: chalk.yellow('No skills found.') });
       return;
     }
 
-    console.log(chalk.green('Available Skills:'));
+    spinner.stopAndPersist({ symbol: '📦', text: chalk.green('成功获取以下 Skills:') });
     skills.forEach(skill => {
-      console.log(`- ${skill}`);
+      console.log(`  - ${skill}`);
     });
   } catch (error: any) {
+    let errorMessage = error.message;
     if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-         console.error(chalk.red('Authentication failed: Invalid token or insufficient permissions.'));
-    } else {
-        console.error(chalk.red(`Error: ${error.message}`));
+         errorMessage = 'Authentication failed: Invalid token or insufficient permissions.';
     }
+    spinner.fail(chalk.red(`获取列表失败: ${errorMessage}`));
     process.exit(1);
   }
 }

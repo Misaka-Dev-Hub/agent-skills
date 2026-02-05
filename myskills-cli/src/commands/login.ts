@@ -1,5 +1,6 @@
 import inquirer from 'inquirer';
 import chalk from 'chalk';
+import ora from 'ora';
 import { setGiteaToken, getConfigPath } from '../config.js';
 import { GiteaClient } from '../api.js';
 
@@ -21,7 +22,7 @@ export async function loginCommand() {
     ]);
 
     const token = answers.token.trim();
-    console.log(chalk.blue('Verifying token...'));
+    const spinner = ora(chalk.cyan('🔑 正在验证 Token 有效性...')).start();
 
     const client = new GiteaClient(token);
 
@@ -29,14 +30,15 @@ export async function loginCommand() {
       // Try to list skills to verify token
       await client.listSkills();
 
-      // If successful, save token
+      spinner.text = chalk.cyan('💾 正在保存配置...');
       setGiteaToken(token);
-      console.log(chalk.green('✅ Login Successful!'));
+
+      spinner.succeed(chalk.green('登录成功！'));
       console.log(chalk.dim(`Config saved at: ${getConfigPath()}`));
       break; // Exit loop
 
     } catch (error: any) {
-      console.error(chalk.red('❌ Authentication failed: Invalid token or insufficient permissions.'));
+      spinner.fail(chalk.red('Authentication failed: Invalid token or insufficient permissions.'));
 
       const retryAnswer = await inquirer.prompt([
         {

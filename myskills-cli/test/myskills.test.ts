@@ -4,6 +4,7 @@ import fs from 'fs';
 import { GiteaClient } from '../src/api.js';
 import { listCommand } from '../src/commands/list.js';
 import inquirer from 'inquirer';
+import chalk from 'chalk';
 
 // Mock axios
 const mockGet = vi.fn();
@@ -31,6 +32,19 @@ vi.mock('inquirer', () => ({
     }
 }));
 
+// Mock ora
+const spinnerMock = {
+    start: vi.fn().mockReturnThis(),
+    stopAndPersist: vi.fn().mockReturnThis(),
+    succeed: vi.fn().mockReturnThis(),
+    fail: vi.fn().mockReturnThis(),
+    text: '',
+};
+vi.mock('ora', () => ({
+    default: vi.fn(() => spinnerMock),
+}));
+
+
 // Spy on console
 const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -42,6 +56,7 @@ describe('MySkills CLI Tests', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockGet.mockReset();
+        spinnerMock.text = '';
     });
 
     describe('GiteaClient', () => {
@@ -66,7 +81,7 @@ describe('MySkills CLI Tests', () => {
     });
 
     describe('listCommand', () => {
-        it('displays skills', async () => {
+        it('displays skills using spinner', async () => {
             mockGet.mockResolvedValue({
                 data: [
                     { name: 'skill1', type: 'dir' },
@@ -74,7 +89,12 @@ describe('MySkills CLI Tests', () => {
             });
 
             await listCommand();
-            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Available Skills'));
+
+            expect(spinnerMock.start).toHaveBeenCalled();
+            expect(spinnerMock.stopAndPersist).toHaveBeenCalledWith(expect.objectContaining({
+                symbol: '📦',
+                text: expect.stringContaining('成功获取以下 Skills')
+            }));
             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('skill1'));
         });
 
@@ -83,17 +103,20 @@ describe('MySkills CLI Tests', () => {
                 data: []
             });
             await listCommand();
-             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('No skills found'));
+             expect(spinnerMock.stopAndPersist).toHaveBeenCalledWith(expect.objectContaining({
+                 symbol: '⚠️',
+                 text: expect.stringContaining('No skills found')
+             }));
         });
 
-        it('handles error gracefully', async () => {
+        it('handles error gracefully with spinner fail', async () => {
             mockGet.mockRejectedValue(new Error('Network Error'));
             try {
                 await listCommand();
             } catch (e: any) {
                 expect(e.message).toBe('EXIT');
             }
-            expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Network Error'));
+            expect(spinnerMock.fail).toHaveBeenCalledWith(expect.stringContaining('Network Error'));
         });
     });
 });
