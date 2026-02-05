@@ -6,6 +6,7 @@ MySkills CLI is a command-line tool designed to automatically download and deplo
 
 - **Skill Discovery**: List all available skills from the remote repository.
 - **Automated Installation**: Download skills directly to your local `.claude/skills` directory.
+- **Persistent Authentication**: Login once, use forever.
 - **Safety**: Prevents accidental overwrites of existing skills.
 
 ## Prerequisites
@@ -36,11 +37,27 @@ MySkills CLI is a command-line tool designed to automatically download and deplo
    npm link
    ```
 
-## Configuration
+## Configuration & Authentication
 
-The tool requires a Gitea Access Token to authenticate with the repository. You must set this token as an environment variable.
+The tool requires a Gitea Access Token to authenticate. You can provide this token in two ways:
 
-### Setting the Environment Variable
+### 1. Interactive Login (Recommended)
+
+Run the login command and follow the prompts. Your token will be securely stored in your system configuration.
+
+```bash
+myskills login
+```
+
+To remove the stored token:
+
+```bash
+myskills logout
+```
+
+### 2. Environment Variable (CI/CD)
+
+For automated environments or temporary overrides, you can set the `GITEA_TOKEN` environment variable. This takes precedence over the stored login.
 
 **Linux / macOS:**
 ```bash
@@ -86,5 +103,5 @@ This will download the `agent-logger` skill to `./.claude/skills/agent-logger/`.
 
 ## Troubleshooting
 
-- **Authentication Failed**: Ensure your `GITEA_TOKEN` is set correctly and has permission to access the repository.
+- **Not Logged In**: Run `myskills login` or set `GITEA_TOKEN`.
 - **Directory Exists**: If the target directory already exists, the tool will ask for confirmation before overwriting.

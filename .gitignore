@@ -1,3 +1,5 @@
 .DS_Store
 myskills-cli/node_modules
 myskills-cli/dist
+.env
+myskills-cli/.env

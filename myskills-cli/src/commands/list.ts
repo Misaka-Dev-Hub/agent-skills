@@ -5,7 +5,7 @@ import { getGiteaToken } from '../config.js';
 export async function listCommand() {
   const token = getGiteaToken();
   if (!token) {
-    console.error(chalk.red('Authentication failed: GITEA_TOKEN environment variable is not set.'));
+    console.error(chalk.red("未登录：请运行 'npx myskills login' 或设置 GITEA_TOKEN 环境变量"));
     process.exit(1);
   }
 
