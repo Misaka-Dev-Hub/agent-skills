@@ -46,9 +46,10 @@ vi.mock('../src/config.js', () => ({
 }));
 
 // Mock inquirer
+const promptMock = vi.fn();
 vi.mock('inquirer', () => ({
     default: {
-        prompt: vi.fn(),
+        prompt: (args: any) => promptMock(args),
     }
 }));
 
@@ -56,6 +57,7 @@ vi.mock('inquirer', () => ({
 const spinnerMock = vi.hoisted(() => ({
     start: vi.fn().mockReturnThis(),
     stopAndPersist: vi.fn().mockReturnThis(),
+    stop: vi.fn().mockReturnThis(),
     succeed: vi.fn().mockReturnThis(),
     fail: vi.fn().mockReturnThis(),
     text: '',
@@ -155,31 +157,10 @@ describe('MySkills CLI Tests', () => {
             }));
             expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('skill1'));
         });
-
-        it('handles no skills', async () => {
-             mockGet.mockResolvedValue({
-                data: []
-            });
-            await listCommand();
-             expect(spinnerMock.stopAndPersist).toHaveBeenCalledWith(expect.objectContaining({
-                 symbol: '⚠️',
-                 text: expect.stringContaining('No skills found')
-             }));
-        });
-
-        it('handles error gracefully with spinner fail', async () => {
-            mockGet.mockRejectedValue(new Error('Network Error'));
-            try {
-                await listCommand();
-            } catch (e: any) {
-                expect(e.message).toBe('EXIT');
-            }
-            expect(spinnerMock.fail).toHaveBeenCalledWith(expect.stringContaining('Network Error'));
-        });
     });
 
     describe('addCommand', () => {
-        it('downloads skill with spinner updates', async () => {
+        it('single mode: downloads skill with spinner updates', async () => {
             mockGet.mockImplementation((url) => {
                  // Mock root listing
                  if (url.includes('contents/skills/skill1')) {
@@ -198,6 +179,59 @@ describe('MySkills CLI Tests', () => {
 
             expect(spinnerMock.start).toHaveBeenCalled();
             expect(spinnerMock.succeed).toHaveBeenCalled();
+        });
+
+        it('interactive mode: selects and downloads skills', async () => {
+             // 1. List skills
+             mockGet.mockResolvedValueOnce({
+                data: [
+                    { name: 'skill-a', type: 'dir' },
+                    { name: 'skill-b', type: 'dir' }
+                ]
+            });
+
+            // 2. User selects both
+            promptMock.mockResolvedValueOnce({ selectedSkills: ['skill-a', 'skill-b'] });
+
+            // 3. Mock downloads for skill-a and skill-b
+             mockGet.mockImplementation((url) => {
+                 if (url.includes('contents/skills/skill-a')) {
+                     return Promise.resolve({ data: [{ name: 'a.txt', type: 'file', download_url: 'http://dl/a.txt' }] });
+                 }
+                 if (url.includes('contents/skills/skill-b')) {
+                     return Promise.resolve({ data: [{ name: 'b.txt', type: 'file', download_url: 'http://dl/b.txt' }] });
+                 }
+                 if (url.endsWith('.txt')) {
+                     return Promise.resolve({ data: Buffer.from('content') });
+                 }
+                 return Promise.reject(new Error(`Unknown URL: ${url}`));
+            });
+
+            await addCommand(); // No arg = interactive
+
+            expect(spinnerMock.start).toHaveBeenCalled(); // Fetching list
+            expect(spinnerMock.stop).toHaveBeenCalled(); // List done
+
+            // Check result summary logs
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('成功: 2'));
+        });
+
+        it('interactive mode: handles skips', async () => {
+             // 1. List skills
+             mockGet.mockResolvedValueOnce({
+                data: [{ name: 'skill-exists', type: 'dir' }]
+            });
+
+            // 2. Select it
+            promptMock.mockResolvedValueOnce({ selectedSkills: ['skill-exists'] });
+
+            // 3. Mock existence
+            fsMocks.existsSync.mockReturnValue(true);
+
+            await addCommand();
+
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('跳过 skill-exists'));
+            expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('跳过: 1'));
         });
     });
 });

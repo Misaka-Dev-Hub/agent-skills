@@ -25,8 +25,8 @@ program
   });
 
 program
-  .command('add <skill_name>')
-  .description('Download and install a skill')
+  .command('add [skill_name]')
+  .description('Download and install a skill (interactive if no name provided)')
   .action(async (skillName) => {
     await addCommand(skillName);
   });
