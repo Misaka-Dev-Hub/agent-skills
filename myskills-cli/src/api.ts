@@ -19,13 +19,13 @@ interface GiteaFile {
 export class GiteaClient {
   private client: AxiosInstance;
 
-  constructor() {
-    const token = getGiteaToken();
+  constructor(token?: string) {
+    const finalToken = token || getGiteaToken();
     this.client = axios.create({
       baseURL: GITEA_BASE_URL,
       headers: {
         Accept: 'application/json',
-        ...(token ? { Authorization: `token ${token}` } : {}),
+        ...(finalToken ? { Authorization: `token ${finalToken}` } : {}),
       },
     });
   }

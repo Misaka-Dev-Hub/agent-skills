@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { getGiteaToken, setGiteaToken, clearGiteaToken } from '../src/config.js';
 import { loginCommand } from '../src/commands/login.js';
 import { logoutCommand } from '../src/commands/logout.js';
-import chalk from 'chalk';
+import { GiteaClient } from '../src/api.js';
 
 // Mock Conf
 const mockConfig: Record<string, any> = {};
@@ -26,14 +26,28 @@ vi.mock('conf', () => {
 });
 
 // Mock Inquirer
+const promptMock = vi.fn();
 vi.mock('inquirer', () => ({
   default: {
-    prompt: vi.fn().mockResolvedValue({ token: 'mock-token-from-inquirer' }),
+    prompt: (args: any) => promptMock(args),
   },
 }));
 
+// Mock API Client
+vi.mock('../src/api.js', () => {
+    return {
+        GiteaClient: vi.fn().mockImplementation(() => ({
+            listSkills: vi.fn(),
+        })),
+    }
+});
+
+
 // Mock Console
 const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => { throw new Error('EXIT'); }) as any);
+
 
 describe('Authentication Module', () => {
   beforeEach(() => {
@@ -60,10 +74,71 @@ describe('Authentication Module', () => {
   });
 
   describe('Login Command', () => {
-    it('should save token to config', async () => {
-      await loginCommand();
-      expect(mockConfig['gitea_token']).toBe('mock-token-from-inquirer');
-      expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Login Successful'));
+    it('should save token if verification succeeds', async () => {
+        // Mock prompt to return token
+        promptMock.mockResolvedValueOnce({ token: 'valid-token' });
+
+        // Mock API success
+        const mockListSkills = vi.fn().mockResolvedValue(['skill1']);
+        (GiteaClient as any).mockImplementation(() => ({
+            listSkills: mockListSkills
+        }));
+
+        await loginCommand();
+
+        expect(mockListSkills).toHaveBeenCalled();
+        expect(mockConfig['gitea_token']).toBe('valid-token');
+        expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Login Successful'));
+    });
+
+    it('should not save token if verification fails and user exits', async () => {
+        // 1. Enter token
+        promptMock.mockResolvedValueOnce({ token: 'invalid-token' });
+
+        // Mock API failure
+        const mockListSkills = vi.fn().mockRejectedValue(new Error('Auth Failed'));
+        (GiteaClient as any).mockImplementation(() => ({
+            listSkills: mockListSkills
+        }));
+
+        // 2. Choose to exit
+        promptMock.mockResolvedValueOnce({ action: 'exit' });
+
+        try {
+            await loginCommand();
+        } catch (e: any) {
+            expect(e.message).toBe('EXIT');
+        }
+
+        expect(mockListSkills).toHaveBeenCalled();
+        expect(mockConfig['gitea_token']).toBeUndefined();
+        expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Authentication failed'));
+    });
+
+    it('should retry if verification fails and user chooses retry', async () => {
+         // 1. Enter invalid token
+         promptMock.mockResolvedValueOnce({ token: 'invalid-token' });
+
+         // Mock API failure first time
+         const mockListSkills = vi.fn()
+            .mockRejectedValueOnce(new Error('Auth Failed'))
+            .mockResolvedValueOnce(['skill1']); // Success second time
+
+         (GiteaClient as any).mockImplementation(() => ({
+             listSkills: mockListSkills
+         }));
+
+         // 2. Choose to retry
+         promptMock.mockResolvedValueOnce({ action: 'retry' });
+
+         // 3. Enter valid token
+         promptMock.mockResolvedValueOnce({ token: 'valid-token' });
+
+         await loginCommand();
+
+         expect(mockListSkills).toHaveBeenCalledTimes(2);
+         expect(mockConfig['gitea_token']).toBe('valid-token');
+         expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('Login Successful'));
     });
   });
 
