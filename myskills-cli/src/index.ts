@@ -3,6 +3,8 @@
 import { Command } from 'commander';
 import { listCommand } from './commands/list.js';
 import { addCommand } from './commands/add.js';
+import { outdatedCommand } from './commands/outdated.js';
+import { upgradeCommand } from './commands/upgrade.js';
 import { loginCommand } from './commands/login.js';
 import { logoutCommand } from './commands/logout.js';
 import { createRequire } from 'module';
@@ -29,6 +31,21 @@ program
   .description('Download and install a skill (interactive if no name provided)')
   .action(async (skillName) => {
     await addCommand(skillName);
+  });
+
+program
+  .command('outdated')
+  .description('Check for outdated skills')
+  .action(async () => {
+    await outdatedCommand();
+  });
+
+program
+  .command('upgrade [skill_name]')
+  .description('Upgrade a skill (or all with --all)')
+  .option('-a, --all', 'Upgrade all outdated skills')
+  .action(async (skillName, options) => {
+    await upgradeCommand(skillName, options);
   });
 
 program

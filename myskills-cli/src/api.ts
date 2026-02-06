@@ -52,6 +52,27 @@ export class GiteaClient {
     }
   }
 
+  async getLatestCommitSha(filePath: string): Promise<string> {
+    try {
+      const url = `/api/v1/repos/${GITEA_OWNER}/${GITEA_REPO}/commits`;
+      const response = await this.client.get(url, {
+        params: {
+          sha: 'main',
+          path: filePath,
+          limit: 1,
+        },
+      });
+
+      if (Array.isArray(response.data) && response.data.length > 0) {
+        return response.data[0].sha;
+      }
+      return '';
+    } catch (error) {
+      console.error('Failed to fetch commit SHA:', error);
+      return '';
+    }
+  }
+
   async downloadSkill(skillName: string, destPath: string, onProgress?: DownloadProgressCallback): Promise<void> {
     const sourcePath = `${GITEA_ROOT_PATH}/${skillName}`;
     try {

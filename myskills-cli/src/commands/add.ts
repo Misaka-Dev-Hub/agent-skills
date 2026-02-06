@@ -5,6 +5,7 @@ import inquirer from 'inquirer';
 import ora from 'ora';
 import { GiteaClient } from '../api.js';
 import { getGiteaToken } from '../config.js';
+import { installSkill } from '../utils/install.js';
 
 export async function addCommand(skillName?: string) {
   const token = getGiteaToken();
@@ -46,7 +47,7 @@ async function installSingleSkill(client: GiteaClient, skillName: string) {
   const spinner = ora(chalk.cyan(`📡 正在获取 ${skillName} 文件清单...`)).start();
 
   try {
-    await client.downloadSkill(skillName, targetDir, (fileName) => {
+    await installSkill(client, skillName, targetDir, (fileName) => {
         spinner.text = chalk.blue(`⬇️ 正在下载: ${fileName}`);
     });
     spinner.succeed(chalk.green(`安装成功！已保存至 ${targetDir}`));
@@ -107,7 +108,7 @@ async function installInteractive(client: GiteaClient) {
 
     const itemSpinner = ora(`${progressPrefix} 正在安装: ${skillName}...`).start();
     try {
-      await client.downloadSkill(skillName, targetDir, (fileName) => {
+      await installSkill(client, skillName, targetDir, (fileName) => {
           itemSpinner.text = chalk.blue(`${progressPrefix} 正在下载: ${skillName} / ${fileName}`);
       });
       itemSpinner.succeed(chalk.green(`${progressPrefix} 安装成功: ${skillName}`));
