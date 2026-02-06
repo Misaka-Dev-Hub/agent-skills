@@ -57,7 +57,6 @@ export class GiteaClient {
       const url = `/api/v1/repos/${GITEA_OWNER}/${GITEA_REPO}/commits`;
       const response = await this.client.get(url, {
         params: {
-          sha: 'main',
           path: filePath,
           limit: 1,
         },
